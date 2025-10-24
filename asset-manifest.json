@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/hyperlocal/static/css/main.cfc31581.css",
+    "main.js": "/hyperlocal/static/js/main.e36154b8.js",
+    "static/js/453.9e6c3a7b.chunk.js": "/hyperlocal/static/js/453.9e6c3a7b.chunk.js",
+    "index.html": "/hyperlocal/index.html",
+    "main.cfc31581.css.map": "/hyperlocal/static/css/main.cfc31581.css.map",
+    "main.e36154b8.js.map": "/hyperlocal/static/js/main.e36154b8.js.map",
+    "453.9e6c3a7b.chunk.js.map": "/hyperlocal/static/js/453.9e6c3a7b.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.cfc31581.css",
+    "static/js/main.e36154b8.js"
+  ]
+}
