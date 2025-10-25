@@ -14,7 +14,7 @@ import './App.css';
 
 // --- 1. FIREBASE CONFIGURATION ---
 const firebaseConfig = {
-  apiKey: "AIzaSyB_iCtl8qTCJAkUxKdyk_vd2DP-bF0vzoM", // <-- Key from your image
+  apiKey: "AIzaSyB_iCtl8qTCJAkUxKdyK_vd2DP-bFOvzoM", // <-- Key from your image
   authDomain: "hyperlocal-f6f64.firebaseapp.com",
   projectId: "hyperlocal-f6f64",
   storageBucket: "hyperlocal-f6f64.appspot.com",
@@ -571,4 +571,3 @@ function App() {
 }
 
 export default App;
-
