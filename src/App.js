@@ -11,14 +11,16 @@ import {
     GoogleAuthProvider,     
     signInWithPopup,        
     RecaptchaVerifier,      
-    signInWithPhoneNumber   
+    signInWithPhoneNumber,
+    sendPasswordResetEmail  // <-- NEW IMPORT
 } from "firebase/auth";
 // --- CSS Import ---
 import './App.css';
 
 // --- 1. FIREBASE CONFIGURATION ---
 const firebaseConfig = {
-  apiKey: "AIzaSyB_iCtl8qTCJAkUxKdyK_vd2DP-bFOvzoM", // Make sure this is correct
+  // --- YOUR API KEY IS NOW ADDED ---
+  apiKey: "AIzaSyB_iCtl8qTCJAkUxKdyK_vd2DP-bFOvzoM", 
   authDomain: "hyperlocal-f6f64.firebaseapp.com",
   projectId: "hyperlocal-f6f64",
   storageBucket: "hyperlocal-f6f64.appspot.com",
@@ -45,7 +47,7 @@ const initialTeachersData = [
 // --- 3. COMPONENTS ---
 
 /**
- * Notification Component
+ * Notification Component (Light Theme)
  */
 const Notification = ({ message, onClose }) => {
   useEffect(() => {
@@ -53,8 +55,9 @@ const Notification = ({ message, onClose }) => {
     return () => clearTimeout(timer);
   }, [message, onClose]);
   if (!message) return null;
-  const isError = message.toLowerCase().includes('failed');
-  const notificationClass = `notification-container ${isError ? 'error' : ''}`; // Use dark theme notification
+  const isError = message.toLowerCase().includes('failed') || message.toLowerCase().includes('error');
+  // Use light-theme notification styles
+  const notificationClass = `light-notification-container ${isError ? 'error' : ''}`;
   return (
     <div className={notificationClass}>
       <p>{message}</p>
@@ -64,12 +67,12 @@ const Notification = ({ message, onClose }) => {
 };
 
 /**
- * Confirmation Modal
+ * Confirmation Modal (Light Theme)
  */
 const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
     <div className="modal-overlay">
-      {/* Use dark-theme modal styles */}
-      <div className="modal-content">
+      {/* Use light-theme modal styles */}
+      <div className="light-modal-content">
         <p>{message}</p>
         <div className="modal-buttons">
           <button className="modal-button cancel" onClick={onCancel}>Cancel</button>
@@ -81,25 +84,24 @@ const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
 
 /**
  * NavBar Component
- * --- UPDATED --- to show profile picture in avatar
  */
-const NavBar = ({ currentUser, onLogout, onHome, onDashboard, onSettings, onPageChange, currentPage, handleBrowseClick }) => {
+const NavBar = ({ currentUser, onLogout, onHome, onDashboard, onSettingsClick, onPageChange, currentPage, handleBrowseClick }) => {
+  // Hide navbar on auth pages
   if (!currentUser) {
-    return null; // Don't render NavBar if no user is logged in
+    return null; 
   }
-  // Dark theme navbar for logged-in users
+
+  // New Light theme navbar for logged-in users
   return (
-    <nav className="navbar"> {/* Removed 'light-navbar' */}
-      <h1 onClick={onHome}>hyperlocal.</h1>
+    <nav className="navbar light-navbar">
+      <h1 onClick={onHome}>Hyperlocal</h1>
       <div className="nav-links">
-          {/* These links navigate *within* the dashboard view */}
           <button className="link-button" onClick={onDashboard}>Dashboard</button>
-          <button className="link-button" onClick={handleBrowseClick}>Browse Skills</button>
+          <button className="link-button" onClick={handleBrowseClick}>My Skills</button>
           <button className="link-button" onClick={() => onPageChange('messages')}>Messages</button>
       </div>
       <div className="nav-user-profile">
-          <button className="nav-avatar-button" onClick={onSettings} title="Settings">
-              {/* --- UPDATED: Show image if it exists (local preview OR google photo) --- */}
+          <button className="nav-avatar-button" onClick={onSettingsClick} title="Settings">
               {currentUser.localPhotoPreview || currentUser.photoURL ? (
                 <img 
                   src={currentUser.localPhotoPreview || currentUser.photoURL} 
@@ -108,7 +110,6 @@ const NavBar = ({ currentUser, onLogout, onHome, onDashboard, onSettings, onPage
                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} // Show initial on error
                 />
               ) : null}
-              {/* Fallback Initial */}
               <span style={{ display: (currentUser.localPhotoPreview || currentUser.photoURL) ? 'none' : 'flex' }}>
                 {currentUser.displayName?.charAt(0) || currentUser.email?.charAt(0) || 'U'}
               </span>
@@ -141,47 +142,37 @@ const HeroSection = ({ onPageChange }) => (
 
 /**
  * ProfileSettings Component
- * --- HEAVILY UPDATED --- Redesigned with profile pic and skills
  */
-const ProfileSettings = ({ currentUser, onSave, showNotification }) => { 
+const ProfileSettings = ({ currentUser, onSave, showNotification, onLogout }) => { 
     const [name, setName] = useState(currentUser?.displayName || currentUser?.email || '');
     const [neighborhood, setNeighborhood] = useState(currentUser?.neighborhood || 'Koramangala');
     const [bio, setBio] = useState(currentUser?.bio || '');
-    
-    // --- NEW State for local image preview ---
     const [localPhotoPreview, setLocalPhotoPreview] = useState(currentUser?.localPhotoPreview || null);
-    
-    // --- NEW State for skills editor ---
     const [editableSkills, setEditableSkills] = useState(currentUser?.mySkills || []);
     const [newSkillInput, setNewSkillInput] = useState('');
-    const fileInputRef = useRef(null); // Ref to trigger file input
+    const fileInputRef = useRef(null); 
 
     const handleSave = () => { 
-        // In a real app, you'd upload the file to Firebase Storage here, get the URL,
-        // and then save *that* URL. For now, we save the local blob URL for demo purposes.
         onSave({ 
             ...currentUser, 
             displayName: name, 
             name: name, 
             neighborhood: neighborhood, 
             bio: bio,
-            photoURL: currentUser.photoURL, // Keep the original Google Photo URL
-            localPhotoPreview: localPhotoPreview, // Add the new local preview
-            mySkills: editableSkills // Add the new skills array
+            photoURL: currentUser.photoURL, 
+            localPhotoPreview: localPhotoPreview, 
+            mySkills: editableSkills 
         }); 
         showNotification("Profile updated successfully! ✅");
     };
 
-    // --- NEW: Handle file selection ---
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            // Create a local URL for instant preview
             setLocalPhotoPreview(URL.createObjectURL(file)); 
         }
     };
     
-    // --- NEW: Handle "Add Skill" button ---
     const handleAddSkill = () => {
         if (newSkillInput && !editableSkills.includes(newSkillInput)) {
             setEditableSkills([...editableSkills, newSkillInput]);
@@ -189,18 +180,17 @@ const ProfileSettings = ({ currentUser, onSave, showNotification }) => {
         }
     };
     
-    // --- NEW: Handle removing a skill ---
     const handleRemoveSkill = (skillToRemove) => {
         setEditableSkills(editableSkills.filter(skill => skill !== skillToRemove));
     };
 
   return (
-    <div className="dashboard-card glass-card" style={{ padding: '2rem' }}>
-      <h2>My Profile Settings</h2>
+    <div className="dashboard-card light-card" style={{ padding: '2rem' }}>
+      <h2>Settings</h2>
       
-      <div className="form-container dark-form-inside-dash"> 
+      <div className="form-container-light"> 
         
-        {/* --- NEW: Profile Pic Uploader --- */}
+        <h3>Personal Info</h3>
         <label>Profile Picture</label>
         <div className="avatar-upload-section">
             <div className="avatar-preview">
@@ -220,7 +210,7 @@ const ProfileSettings = ({ currentUser, onSave, showNotification }) => {
               accept="image/*" 
               onChange={handleFileChange} 
               ref={fileInputRef}
-              style={{ display: 'none' }} // Hide the default input
+              style={{ display: 'none' }} 
             />
             <button className="upload-button" onClick={() => fileInputRef.current.click()}>
                 Choose File
@@ -230,7 +220,7 @@ const ProfileSettings = ({ currentUser, onSave, showNotification }) => {
             </button>
         </div>
          <p className="sub-label" style={{textAlign: 'center', marginTop: '-1rem'}}>
-             Image preview is local & temporary. (Full upload requires Firebase Storage setup).
+             Image preview is local & temporary.
          </p>
         
         <label>Full Name:</label>
@@ -242,7 +232,6 @@ const ProfileSettings = ({ currentUser, onSave, showNotification }) => {
         <label>About Me (Bio):</label>
         <textarea rows="5" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell people..."></textarea>
         
-        {/* --- NEW: My Skills Editor --- */}
         <label>My Skills</label>
         <div className="my-skills-editor">
             <div className="skills-tag-list">
@@ -265,6 +254,29 @@ const ProfileSettings = ({ currentUser, onSave, showNotification }) => {
         </div>
         
         <button onClick={handleSave} style={{ width: 'auto', padding: '12px 24px', marginTop: '2rem' }}>Save Changes</button>
+        
+        <h3 style={{ marginTop: '3rem' }}>Payments</h3>
+        <div className="payments-coming-soon">
+            <span role="img" aria-label="wip">💳</span>
+            <p>Payments are coming soon!</p>
+            <p className="sub-label">We're working hard to bring secure and easy payment options to Hyperlocal.</p>
+        </div>
+
+        <h3 style={{ marginTop: '3rem' }}>Currency</h3>
+        <div className="payments-coming-soon">
+            <span role="img" aria-label="currency">💰</span>
+            <p>Currency settings are coming soon!</p>
+            <p className="sub-label">You'll be able to select your preferred currency for transactions.</p>
+        </div>
+
+        <h3 style={{ marginTop: '3rem' }}>Account</h3>
+        <div className="logout-section">
+            <p>You are logged in as <strong>{currentUser.email}</strong></p>
+            <button className="logout-button-settings" onClick={onLogout}>
+                <span className="logout-icon">🚪</span> Log Out
+            </button>
+        </div>
+
       </div>
     </div>
   );
@@ -273,9 +285,8 @@ const ProfileSettings = ({ currentUser, onSave, showNotification }) => {
 
 /**
  * Dashboard Component
- * --- UPDATED --- to show profile pic and new skills
  */
-const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDelete, onPageChange, onLogout, onSaveProfile }) => {
+const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDelete, onPageChange, onLogout, onSaveProfile, showNotification }) => {
   const [activeView, setActiveView] = useState('home'); 
   const myTeachersListings = currentUser ? teachers.filter(teacher => teacher.uid === currentUser.uid) : [];
   const myTutorProfile = currentUser.role === 'teacher' ? myTeachersListings[0] : null;
@@ -284,13 +295,14 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
 
   // --- Sidebar Component ---
   const DashboardSidebar = () => (
-    <div className="dashboard-sidebar glass-card"> 
+    <div className="dashboard-sidebar">
       <nav>
         <button className={`sidebar-button ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}>Home</button>
         <button className={`sidebar-button ${activeView === 'browse' ? 'active' : ''}`} onClick={() => setActiveView('browse')}>Browse Skills</button>
         <button className={`sidebar-button ${activeView === 'messages' ? 'active' : ''}`} onClick={() => setActiveView('messages')}>Messages</button>
         <button className={`sidebar-button ${activeView === 'howItWorks' ? 'active' : ''}`} onClick={() => setActiveView('howItWorks')}>How It Works</button>
         <button className={`sidebar-button ${activeView === 'settings' ? 'active' : ''}`} onClick={() => setActiveView('settings')}>Settings</button>
+        <button className="sidebar-button logout-button-sidebar" onClick={onLogout}>Logout</button>
       </nav>
     </div>
   );
@@ -307,7 +319,7 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
         <div className="dashboard-section">
           <h3>My tutor profile</h3>
           {myTutorProfile ? (
-            <div className="tutor-profile-card glass-card"> 
+            <div className="tutor-profile-card">
               <div className="skill-icon-placeholder python-icon"></div> 
               <div className="tutor-card-details">
                 <span className="skill-offered-badge">SKILL OFFERED</span>
@@ -316,7 +328,7 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
               <button className="view-profile-button" onClick={() => onPageChange('profile', myTutorProfile)}>View Profile</button>
             </div>
           ) : (
-            <div className="tutor-profile-card simple glass-card"> 
+            <div className="tutor-profile-card simple">
               <p>You haven't created a skill listing yet.</p>
               <button className="view-profile-button" onClick={onCreateListing}>Create Listing</button>
             </div>
@@ -327,15 +339,15 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
       <div className="dashboard-section">
         <h3>Browse Skills</h3>
         <div className="browse-skills-row">
-          <div className="browse-skill-card-small glass-card" onClick={() => setActiveView('browse')}>
+          <div className="browse-skill-card-small" onClick={() => setActiveView('browse')}>
             <div className="skill-icon-placeholder paint-icon"></div>
             <span>Learn Painting</span>
           </div>
-          <div className="browse-skill-card-small glass-card" onClick={() => setActiveView('browse')}>
+          <div className="browse-skill-card-small" onClick={() => setActiveView('browse')}>
             <div className="skill-icon-placeholder guitar-icon"></div>
             <span>Learn Guitar</span>
           </div>
-          <div className="browse-skill-card-small more glass-card" onClick={() => setActiveView('browse')}>
+          <div className="browse-skill-card-small more" onClick={() => setActiveView('browse')}>
             <span>View All...</span>
           </div>
         </div>
@@ -346,11 +358,9 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
   // --- Right Sidebar Component ---
   const DashboardRightSidebar = () => (
     <div className="dashboard-right-sidebar">
-      {/* --- UPDATED: Profile Summary Card --- */}
-       <div className="dashboard-card glass-card">
+       <div className="dashboard-card light-card">
           <div className="profile-summary">
             <div className="avatar-placeholder">
-              {/* --- UPDATED: Show image if it exists --- */}
               {currentUser.localPhotoPreview || currentUser.photoURL ? (
                 <img 
                   src={currentUser.localPhotoPreview || currentUser.photoURL} 
@@ -371,8 +381,7 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
           </div>
         </div>
 
-      {/* --- UPDATED: My Skills --- */}
-      <div className="dashboard-card glass-card">
+      <div className="dashboard-card light-card">
         <h3>My Skills</h3>
         <ul className="my-skills-list">
           {currentUser.mySkills && currentUser.mySkills.length > 0 ? (
@@ -380,13 +389,11 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
               <li key={index}><span className="skill-check-icon">✅</span> {skill}</li>
             ))
           ) : (
-            <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Add skills in your profile settings!</p>
+            <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', padding: '0 1.5rem 1.5rem'}}>Add skills in your profile settings!</p>
           )}
         </ul>
       </div>
-
-      {/* Top Skills to Learn */}
-      <div className="dashboard-card glass-card">
+      <div className="dashboard-card light-card">
         <h3>Top Skills To Learn</h3>
         <div className="top-skill-card" onClick={() => setActiveView('browse')}>
           <span>Learn Guitar</span>
@@ -398,7 +405,7 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
   
   // --- Inline How It Works Component ---
   const HowItWorksInline = () => (
-    <div className="dashboard-card glass-card" style={{ paddingBottom: '2.5rem' }}>
+    <div className="dashboard-card light-card" style={{ paddingBottom: '2.5rem' }}>
       <h2 className="how-it-works-title">How Hyperlocal Works</h2>
       <p className="how-it-works-subtitle">Connecting learners and teachers in your neighborhood is simple.</p>
       <div className="how-it-works-cards">
@@ -418,7 +425,7 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
         return <Home teachers={teachers} onSelectTeacher={(t) => onPageChange('profile', t)} onCreateListing={onCreateListing} currentUser={currentUser} onPageChange={onPageChange} isDashboardView={true} />;
       case 'messages':
         return (
-          <div className="dashboard-card glass-card" style={{ padding: '2rem' }}>
+          <div className="dashboard-card light-card" style={{ padding: '2rem' }}>
             <h3>My Messages</h3>
             <div className="message-preview"><p><strong>Rohan Mehta</strong> (Yoga)</p><p>5 PM Tuesday good? ...</p></div>
             <div className="message-preview"><p><strong>Aisha Khan</strong> (Guitar)</p><p>Yes, I can teach G chord...</p></div>
@@ -427,7 +434,7 @@ const Dashboard = ({ currentUser, onBrowse, onCreateListing, teachers, confirmDe
       case 'howItWorks':
         return <HowItWorksInline />;
       case 'settings':
-        return <ProfileSettings currentUser={currentUser} onSave={onSaveProfile} showNotification={onPageChange} />; // Pass showNotification
+        return <ProfileSettings currentUser={currentUser} onSave={onSaveProfile} showNotification={showNotification} onLogout={onLogout} />;
       default:
         return <DashboardHome />;
     }
@@ -512,9 +519,7 @@ const Login = ({ showSignUp, showNotification, onPageChange }) => {
       console.error("Phone Sign-In Error (Send):", error);
       showNotification(`Failed to send OTP: ${error.message} 😞`);
       if (window.grecaptcha && window.recaptchaVerifier) {
-          window.recaptchaVerifier.render().then(widgetId => {
-              window.grecaptcha.reset(widgetId);
-          });
+          window.grecaptcha.reset(widgetId); // This line had the 'widgetId' error
       }
     } finally {
       setLoading(false);
@@ -562,7 +567,10 @@ const Login = ({ showSignUp, showNotification, onPageChange }) => {
                 <form onSubmit={handleEmailLogin}>
                   <div className="auth-input-group icon-left"><span>👤</span><input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
                   <div className="auth-input-group icon-left"><span>🔒</span><input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
-                  <div className="auth-options"><label className="auth-checkbox-label"><input type="checkbox" /> Remember me</label><button type="button" className="auth-link-button small-text">Forgot?</button></div>
+                  <div className="auth-options">
+                      <label className="auth-checkbox-label"><input type="checkbox" /> Remember me</label>
+                      <button type="button" className="auth-link-button small-text" onClick={() => onPageChange('forgotPassword')}>Forgot?</button>
+                  </div>
                   <button type="submit" className="auth-submit-button large" disabled={loading}>{loading ? 'Signing In...' : 'Sign In'}</button>
                 </form>
               )}
@@ -713,6 +721,56 @@ const SignUp = ({ showLogin, showNotification, onPageChange }) => {
 };
 
 /**
+ * ForgotPassword Component
+ */
+const ForgotPassword = ({ showLogin, showNotification, onPageChange }) => {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (!email) { showNotification("Please enter your email address. ⚠️"); return; }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showNotification("Password reset link sent! Check your inbox. 📬");
+      showLogin(); // Go back to the login page
+    } catch (error) {
+      console.error("Password Reset Error:", error);
+      let msg = `Error: ${error.message} 😞`;
+      if (error.code === 'auth/user-not-found') { msg = "No user found with this email. 😞"; }
+      showNotification(msg);
+    }
+    setLoading(false);
+  };
+  return (
+     <div className="auth-page-container signup-page"> {/* Reuse signup page layout */}
+      <div className="auth-left-panel purple-gradient">
+          <div className="auth-left-content">
+              <h1 className="auth-main-title">Forgot Password?</h1>
+              <p className="auth-description">No problem. Enter your email below and we'll send you a link to reset it.</p>
+          </div>
+      </div>
+      <div className="auth-right-panel light-bg">
+          <form className="auth-form-container" onSubmit={handleReset}>
+              <h2>Reset Password</h2>
+              <div className="auth-input-group icon-left">
+                  <span>✉️</span> 
+                  <input type="email" placeholder="Your registered email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+              <button type="submit" className="auth-submit-button large" disabled={loading}>
+                {loading ? 'Sending...' : 'Send Reset Link'}
+              </button>
+              <p className="auth-switch-prompt small-text">
+                Remembered it? <button type="button" className="auth-link-button small-text" onClick={showLogin}>Back to Sign In</button>
+              </p>
+          </form>
+      </div>
+    </div>
+  );
+};
+
+
+/**
  * TeacherApplicationForm
  */
 const TeacherApplicationForm = ({ showLogin, showNotification, onPageChange }) => { 
@@ -767,8 +825,11 @@ const Home = ({ teachers, onSelectTeacher, onCreateListing, currentUser, onPageC
   );
   return (
     <>
+      {/* Show Hero only if NOT logged in */}
       {!currentUser && <HeroSection onPageChange={onPageChange} />} 
-      <div className="browse-container logged-in-browse">
+      
+      {/* --- This browse container is for both logged-in and public --- */}
+      <div className={`browse-container ${!currentUser ? 'public-browse' : 'logged-in-browse'}`}>
         {currentUser && <h2>Welcome, {currentUser.displayName || currentUser.email}! Start learning locally.</h2>}
         <div className="browse-search-bar"><input type="text" placeholder="Search skills or teachers..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div>
         <h3 id="featured-skills" className="featured-skills-title">{searchTerm ? `Results for "${searchTerm}"` : "Featured Skills Nearby"}</h3>
@@ -825,10 +886,10 @@ const CreateListing = ({ onBack, onPublish, currentUser, showNotification }) => 
     onPublish(newSkill);
   };
   return (
-    <div className="dashboard-card glass-card" style={{ padding: '2rem' }}> {/* Use glass card style */}
+    <div className="dashboard-card light-card" style={{ padding: '2rem' }}> 
       <button className="back-button" onClick={onBack}>&larr; Back to Dashboard</button>
       <h2>Create Skill Listing</h2>
-       <div className="form-container dark-form-inside-dash">
+       <div className="form-container-light">
           <label htmlFor="s-teach">Skill:</label><input id="s-teach" value={skill} onChange={e=>setSkill(e.target.value)} />
           <label htmlFor="s-desc">Description:</label><textarea id="s-desc" value={description} onChange={e=>setDescription(e.target.value)} />
           <label htmlFor="s-comp">Compensation:</label><input id="s-comp" value={compensation} onChange={e=>setCompensation(e.target.value)} />
@@ -857,15 +918,10 @@ const Messaging = ({ teacher, onBack }) => {
 };
 
 /**
- * SettingsMenu Component (No longer used, logic moved into Dashboard)
- */
-// const SettingsMenu = ... (Can be deleted)
-
-/**
  * History Component
  */
 const History = ({ onBack }) => (
-    <div className="dashboard-card glass-card" style={{ padding: '2rem' }}>
+    <div className="dashboard-card light-card" style={{ padding: '2rem' }}>
       <button className="back-button" onClick={onBack}>&larr; Back</button>
       <h2>History</h2>
       <div className="history-list">
@@ -879,7 +935,7 @@ const History = ({ onBack }) => (
  * PaymentsComingSoon Component
  */
 const PaymentsComingSoon = ({ onBack }) => (
-    <div className="dashboard-card glass-card" style={{ padding: '2rem' }}>
+    <div className="dashboard-card light-card" style={{ padding: '2rem' }}>
       <button className="back-button" onClick={onBack}>&larr; Back</button>
       <h2>Payments</h2><p className="text-center">Coming soon!</p>
       <div className="text-center" style={{marginTop:'20px'}}><span role="img" aria-label="wip" style={{fontSize:'3em'}}>🚧</span></div>
@@ -919,7 +975,7 @@ function App() {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [scrollToFeatured, setScrollToFeatured] = useState(false);
-
+  const [dashboardInitialView, setDashboardInitialView] = useState('home'); // State for dashboard's internal view
 
   const showNotification = (message) => { setNotification(message); };
   const closeNotification = () => { setNotification(null); };
@@ -927,32 +983,37 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
+        // Assign a default 'learner' role based on simple logic
+        // In a real app, fetch role from Firestore based on user.uid
         const assumedRole = user.email?.includes('@teacher.com') ? 'teacher' : 'learner'; // Example: email determines role
         const userWithRole = {
              uid: user.uid,
              email: user.email,
              displayName: user.displayName || user.email?.split('@')[0] || 'User',
-             role: assumedRole, 
+             role: assumedRole, // Use assumed role
              name: user.displayName || user.email?.split('@')[0] || 'User',
              photoURL: user.photoURL || null, // Get photoURL from Google
              // Placeholders - fetch these from Firestore
              neighborhood: 'Koramangala',
              bio: 'Welcome!',
-             mySkills: ['Python', 'Cooking', 'Gardening'] // Placeholder skills
+             mySkills: ['Python', 'Cooking'] // Placeholder skills
          };
         setCurrentUser(userWithRole);
-        if (page === 'login' || page === 'signup' || authLoading) {
+        // Redirect to dashboard only if coming from auth pages or initial load
+        // Ensure authLoading check happens correctly
+        if (page === 'login' || page === 'signup' || page === 'forgotPassword' || authLoading) {
              setPage('dashboard');
         }
       } else {
         setCurrentUser(null);
-        if (!['login', 'signup', 'signup-teacher', 'home', 'howItWorks'].includes(page)) {
+        if (!['login', 'signup', 'signup-teacher', 'home', 'howItWorks', 'forgotPassword'].includes(page)) {
              setPage('login');
         }
       }
       setAuthLoading(false);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once
 
   useEffect(() => {
@@ -966,28 +1027,24 @@ function App() {
   }, [scrollToFeatured, page]);
 
 
-  const handleLogout = async () => { try { await signOut(auth); showNotification("Logged out."); setPage('login'); } catch (e) { showNotification(`Logout Failed: ${e.message}`); } };
+  const handleLogout = async () => { try { await signOut(auth); showNotification("Logged out."); setPage('login'); /* Explicitly go to login */ } catch (e) { showNotification(`Logout Failed: ${e.message}`); } };
   const handleSelectTeacher = (t) => { setSelectedTeacher(t); setPage('profile'); };
   const handleMessage = (t) => { setSelectedTeacher(t); setPage('messaging'); };
-  
   const handleProfileSave = (updatedUser) => {
-      // Update local state
+      // In real app: Update Firestore AND potentially Auth profile
       setCurrentUser(updatedUser); 
+      // setPage('settings'); // Stay on settings page
       showNotification("Profile updated! ✅");
-      
-      // Update Firebase Auth Profile
       if(auth.currentUser) {
           updateProfile(auth.currentUser, { 
               displayName: updatedUser.displayName,
-              photoURL: updatedUser.photoURL // Note: This saves Google URL, not local preview
+              // Use local preview if it exists, otherwise fall back to existing photoURL
+              photoURL: updatedUser.localPhotoPreview || updatedUser.photoURL 
           }).catch(e => console.error("Error updating auth profile:", e));
       }
-      // In real app: Save updatedUser (bio, neighborhood, skills) to Firestore
-      
       // Update name in local teacher list if they are a teacher
       setTeachers(prev => prev.map(t => t.uid === currentUser.uid ? { ...t, name: updatedUser.displayName } : t ));
   };
-
   const handlePublishListing = (newListing) => { setTeachers(prev => [newListing, ...prev]); setPage('dashboard'); showNotification("Skill published! 🎉"); };
   const handleConfirmDelete = (id, skillName) => { setItemToDelete({ id, name: skillName }); setShowConfirmModal(true); };
   const handleDeleteListing = () => { if (itemToDelete) { setTeachers(prev => prev.filter(t => t.id !== itemToDelete.id)); showNotification(`"${itemToDelete.name}" deleted.`); setItemToDelete(null); } setShowConfirmModal(false); };
@@ -995,9 +1052,7 @@ function App() {
 
   const handleBrowseClick = () => {
       if (page === 'dashboard') {
-          // Find the Dashboard component and tell it to switch views
-          // This is tricky. A better way is to make 'home' the browse page
-          setPage('home'); // 'home' is now the logged-in browse page
+          setPage('home'); // Switch to home (browse) page
       } else if (page === 'home') {
           const featuredElement = document.getElementById('featured-skills');
           if (featuredElement) {
@@ -1008,6 +1063,12 @@ function App() {
           setScrollToFeatured(true);
       }
   };
+  
+  // --- NEW: Handler for clicking avatar/settings ---
+  const handleSettingsClick = () => {
+      setPage('dashboard');
+      setDashboardInitialView('settings'); // Tell dashboard to open settings
+  }
 
 
   const commonProps = { currentUser, onBrowse: handleBrowseClick, onCreateListing: () => setPage('createListing'), teachers, confirmDelete: handleConfirmDelete, onPageChange: (pageName, data) => { setPage(pageName); if (data) setSelectedTeacher(data); }, onLogout: handleLogout, onSaveProfile: handleProfileSave, showNotification };
@@ -1022,6 +1083,8 @@ function App() {
         case 'signup': return <SignUp onPageChange={setPage} showLogin={() => setPage('login')} showNotification={showNotification}/>;
         case 'signup-teacher': return <TeacherApplicationForm onPageChange={setPage} showLogin={() => setPage('login')} showNotification={showNotification} />;
         case 'howItWorks': return <HowItWorks onPageChange={setPage} />;
+        case 'forgotPassword': // <-- NEW CASE
+          return <ForgotPassword onPageChange={setPage} showLogin={() => setPage('login')} showNotification={showNotification} />;
         case 'home': 
         default:
            return <Home onPageChange={setPage} teachers={teachers} onSelectTeacher={handleSelectTeacher} currentUser={currentUser} onCreateListing={() => setPage('createListing')} />;
@@ -1031,7 +1094,7 @@ function App() {
     // Logged In Routes
     switch (page) {
       case 'dashboard': 
-        return <Dashboard {...commonProps} />;
+        return <Dashboard {...commonProps} initialActiveView={dashboardInitialView} />;
       case 'profile': 
         const teacherDetails = teachers.find(t => t.id === selectedTeacher?.id);
         return <Profile teacher={teacherDetails} onBack={() => setPage('home')} onMessage={handleMessage} />;
@@ -1043,9 +1106,14 @@ function App() {
       case 'home': // Logged-in home
         return <Home onPageChange={setPage} teachers={teachers} onSelectTeacher={handleSelectTeacher} currentUser={currentUser} onCreateListing={() => setPage('createListing')} />;
       
-      // Fallback for pages now inside dashboard (settings, history, etc.)
+      // Fallback for pages now inside dashboard
+      case 'settings': 
+      case 'history': 
+      case 'paymentsComingSoon': 
+        return <Dashboard {...commonProps} initialActiveView={page} />; // Pass page as initial view
+        
       default: 
-        return <Dashboard {...commonProps} />;
+        return <Dashboard {...commonProps} initialActiveView="home" />;
     }
   };
 
@@ -1056,19 +1124,18 @@ function App() {
       <NavBar
           currentUser={currentUser}
           onLogout={handleLogout}
-          onHome={() => setPage('home')} 
-          onDashboard={() => setPage('dashboard')}
-          onSettings={() => setPage('dashboard')} // Make settings button open dashboard
+          onHome={handleBrowseClick} 
+          onDashboard={() => { setPage('dashboard'); setDashboardInitialView('home'); }}
+          onSettingsClick={handleSettingsClick} // <-- NEW HANDLER for avatar
           onPageChange={setPage}
           currentPage={page}
           handleBrowseClick={handleBrowseClick} 
       />
-      {/* --- ADDED a wrapper div for reCAPTCHA elements --- */}
       <div id="recaptcha-wrapper">
           <div id="recaptcha-container"></div>
           <div id="recaptcha-container-signup"></div>
       </div>
-      <main className={['login', 'signup', 'signup-teacher', 'home'].includes(page) && !currentUser ? 'auth-content' : 'content'}>
+      <main className={['login', 'signup', 'signup-teacher', 'home', 'howItWorks', 'forgotPassword'].includes(page) && !currentUser ? 'auth-content' : 'content'}>
         {renderPage()}
       </main>
     </div>
